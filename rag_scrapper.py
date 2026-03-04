@@ -9,9 +9,7 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_pinecone import PineconeVectorStore
 from pinecone import Pinecone
 
-# ----------------------------
-# CONFIG
-# ----------------------------
+# pinecone connection through api
 
 api_key = "ADD API KEY HERE"
 
