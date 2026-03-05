@@ -1,159 +1,155 @@
 # LLM Hallucination Detection & Correction Using RAG
 
-A Retrieval-Augmented Generation (RAG) web scraper that helps reduce LLM hallucinations by grounding responses in real web content. This application scrapes web pages, stores them in a vector database, and uses retrieved context to provide accurate, fact-based answers.
+A Retrieval-Augmented Generation (RAG) assistant that reduces hallucinations by grounding answers in real-time web content. The app takes a user question, searches relevant pages, scrapes them, stores chunks in Pinecone, and generates a context-grounded answer.
 
 ## How It Works
 
 ```
-┌─────────────┐     ┌──────────────┐     ┌─────────────────┐     ┌───────────┐
-│  Enter URL  │ ──► │ Scrape Page  │ ──► │ Split into      │ ──► │ Generate  │
-│             │     │ (WebLoader)  │     │ Chunks (2000)   │     │ Embeddings│
-└─────────────┘     └──────────────┘     └─────────────────┘     └─────┬─────┘
-                                                                       │
-                                                                       ▼
-┌─────────────┐     ┌──────────────┐     ┌─────────────────┐     ┌───────────┐
-│   Answer    │ ◄── │  LLM (Llama  │ ◄── │ Retrieve Top 3  │ ◄── │  Pinecone │
-│  (Grounded) │     │    3.2)      │     │ Similar Chunks  │     │  Vector DB│
-└─────────────┘     └──────────────┘     └─────────────────┘     └───────────┘
+┌─────────────────┐     ┌────────────────────┐     ┌──────────────────┐
+│ Ask a Question  │ ──► │ Google Search      │ ──► │ Scrape Top URLs  │
+│ (chat input)    │     │ (SerpAPI, top 5)   │     │ (WebBaseLoader)  │
+└─────────────────┘     └────────────────────┘     └────────┬─────────┘
+                                                             │
+                                                             ▼
+┌──────────────────┐     ┌────────────────────┐     ┌──────────────────┐
+│ Pinecone Store   │ ◄── │ Chunk + Embed      │ ◄── │ Split Documents  │
+│ (rag-embedds)    │     │ (nomic-embed-text) │     │ (2000 / 100)     │
+└────────┬─────────┘     └────────────────────┘     └──────────────────┘
+         │
+         ▼
+┌──────────────────┐     ┌────────────────────┐     ┌──────────────────┐
+│ Retrieve Top 3   │ ──► │ Build Prompt       │ ──► │ Generate Answer  │
+│ similar chunks   │     │ with context        │     │ (llama3.2)       │
+└──────────────────┘     └────────────────────┘     └──────────────────┘
 ```
 
 ### Step-by-Step Process
 
-1. **URL Input**: User enters a webpage URL to index
-2. **Web Scraping**: `WebBaseLoader` fetches the page content
-3. **Text Splitting**: Content is split into 2000-character chunks with 100-char overlap
-4. **Embedding Generation**: `nomic-embed-text` model creates 768-dimensional embeddings for each chunk
-5. **Vector Storage**: Embeddings are stored in Pinecone vector database
-6. **Question Input**: User asks a question about the indexed content
-7. **Similarity Search**: Top 3 most relevant chunks are retrieved from Pinecone
-8. **Answer Generation**: `llama3.2` generates an answer using only the retrieved context
-9. **Hallucination Reduction**: By grounding responses in actual web content, hallucinations are minimized
+1. User enters a question in Streamlit chat.
+2. App fetches related Google results using SerpAPI and keeps top 5 links.
+3. App fetches related Google Images (top 4) and displays them.
+4. App scrapes content from discovered URLs with WebBaseLoader.
+5. Documents are split into chunks (chunk size 2000, overlap 100).
+6. Chunks are embedded with nomic-embed-text (768 dimensions).
+7. Embedded chunks are inserted into Pinecone index rag-embedds.
+8. Similarity search retrieves top 3 relevant chunks.
+9. llama3.2 generates a detailed response using retrieved context.
 
 ## Features
 
-- **Fast Embeddings**: Uses `nomic-embed-text` (768 dims) - ~50x faster than LLM-based embeddings
-- **Accurate Answers**: `llama3.2` for high-quality response generation
-- **Persistent Storage**: Pinecone vector database for scalable, persistent storage
-- **Streamlit UI**: Clean, interactive web interface
-- **Caching**: Model caching for faster subsequent requests
+- Question-first workflow (no manual URL entry required)
+- Web search via SerpAPI to discover fresh sources
+- Related image preview for user context
+- Pinecone-backed persistent vector storage
+- Ollama local models for embeddings and answer generation
+- Streamlit UI with cached model loading
 
 ## Prerequisites
 
 - Python 3.10+
-- [Ollama](https://ollama.ai/) installed and running
-- [Pinecone](https://www.pinecone.io/) account (free tier available)
+- Ollama installed and running
+- Pinecone account
+- SerpAPI account and API key
 
 ## Local Setup
 
-### 1. Clone the Repository
+### 1) Clone and enter project
 
 ```bash
 git clone https://github.com/Rishiraj-Pathak-27/LLM-Hallucination-Detection-Correction-Using-RAG.git
 cd LLM-Hallucination-Detection-Correction-Using-RAG
 ```
 
-### 2. Create Virtual Environment
+### 2) Create and activate virtual environment
 
 ```bash
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+source venv/bin/activate
 ```
 
-### 3. Install Dependencies
+### 3) Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Install and Start Ollama
+### 4) Install and start Ollama
 
 ```bash
-# Install Ollama (Linux)
 curl -fsSL https://ollama.com/install.sh | sh
-
-# Pull required models
 ollama pull llama3.2
 ollama pull nomic-embed-text
-
-# Start Ollama server (if not running)
 ollama serve
 ```
 
-### 5. Set Up Pinecone
+### 5) Create Pinecone index
 
-1. Create a free account at [Pinecone](https://www.pinecone.io/)
-2. Create a new index with:
-   - **Index Name**: `rag-index`
-   - **Dimensions**: `768` (matches nomic-embed-text)
-   - **Metric**: `cosine`
-3. Copy your API key
+Create an index with:
 
-### 6. Configure API Key
+- Index name: rag-embedds
+- Dimension: 768
+- Metric: cosine
 
-Open `rag_scrapper.py` and replace the placeholder with your Pinecone API key:
+Important: The embedding model nomic-embed-text outputs 768-d vectors. If index dimension is different, upsert fails.
 
-```python
-api_key = "YOUR_PINECONE_API_KEY_HERE"
+### 6) Configure API keys
+
+Current code reads keys from constants in rag_scrapper.py and sets environment variables at runtime.
+
+You should replace hardcoded values with your own keys or move fully to environment variables:
+
+```bash
+export SERPAPI_API_KEY="your-serpapi-key"
+export PINECONE_API_KEY="your-pinecone-key"
 ```
 
-> ⚠️ **Security Note**: For production, use environment variables instead:
-> ```bash
-> export PINECONE_API_KEY="your-api-key"
-> ```
-
-### 7. Run the Application
+### 7) Run app
 
 ```bash
 streamlit run rag_scrapper.py
 ```
 
-The app will open in your browser at `http://localhost:8501`
-
 ## Usage
 
-1. **Index a Webpage**:
-   - Enter a URL in the text field
-   - Click "Load & Index"
-   - Wait for the success message
-
-2. **Ask Questions**:
-   - Type your question in the chat input at the bottom
-   - The AI will respond using only the indexed content
-   - Answers are limited to 3 sentences for conciseness
-
-3. **Index More Pages**:
-   - You can index multiple URLs
-   - All content is stored in Pinecone and persists across sessions
+1. Ask any question in the chat box.
+2. App shows related images and discovered source URLs.
+3. App scrapes, chunks, embeds, and stores content in Pinecone.
+4. App retrieves relevant chunks and returns a grounded answer.
 
 ## Project Structure
 
 ```
-├── rag_scrapper.py      # Main application file
-├── requirements.txt     # Python dependencies
-├── .gitignore          # Git ignore rules
-└── README.md           # This file
+├── rag_scrapper.py
+├── requirements.txt
+└── README.md
 ```
 
-## Technologies Used
+## Tech Stack
 
 | Component | Technology | Purpose |
 |-----------|------------|---------|
-| UI | Streamlit | Web interface |
-| Web Scraping | LangChain WebBaseLoader | Fetch page content |
-| Text Splitting | RecursiveCharacterTextSplitter | Chunk documents |
-| Embeddings | nomic-embed-text (Ollama) | Convert text to vectors |
-| Vector DB | Pinecone | Store and retrieve embeddings |
-| LLM | llama3.2 (Ollama) | Generate answers |
-| Framework | LangChain | Orchestration |
+| UI | Streamlit | Interactive app |
+| Search | SerpAPI | Web links + image results |
+| Scraping | WebBaseLoader | Load web page content |
+| Splitter | RecursiveCharacterTextSplitter | Chunk long text |
+| Embeddings | nomic-embed-text (Ollama) | Vectorize text |
+| Vector DB | Pinecone | Store/retrieve embeddings |
+| LLM | llama3.2 (Ollama) | Context-grounded answer |
+| Orchestration | LangChain | Pipeline composition |
 
 ## Troubleshooting
 
-| Issue | Solution |
-|-------|----------|
-| `ollama: command not found` | Install Ollama: `curl -fsSL https://ollama.com/install.sh \| sh` |
-| `model not found` | Pull models: `ollama pull llama3.2 && ollama pull nomic-embed-text` |
-| `Pinecone connection error` | Check API key and index name |
-| `Slow indexing` | Normal for first run; models are cached after |
+| Issue | Fix |
+|------|-----|
+| Vector dimension mismatch | Recreate Pinecone index with dimension 768 |
+| Pinecone API key missing | Set PINECONE_API_KEY correctly |
+| SerpAPI errors | Check SERPAPI_API_KEY and account quota |
+| No scraped docs | Query may return blocked/unreachable URLs |
+| model not found | Run ollama pull llama3.2 and ollama pull nomic-embed-text |
+
+## Security Note
+
+Do not commit real API keys to source control. Move keys to environment variables before publishing this project.
 
 ## License
 
@@ -161,4 +157,4 @@ MIT License
 
 ## Contributing
 
-Pull requests are welcome. For major changes, please open an issue first.
+Pull requests are welcome. For major changes, open an issue first.
