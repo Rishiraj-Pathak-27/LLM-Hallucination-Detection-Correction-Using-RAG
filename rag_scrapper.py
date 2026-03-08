@@ -24,8 +24,8 @@ from pinecone import Pinecone
 
 # api keys section 
 
-SERPAPI_API_KEY = ""
-PINECONE_API_KEY = ""
+SERPAPI_API_KEY = "Enter api"
+PINECONE_API_KEY = "Enter api"
 
 os.environ["SERPAPI_API_KEY"] = SERPAPI_API_KEY
 os.environ["PINECONE_API_KEY"] = PINECONE_API_KEY
