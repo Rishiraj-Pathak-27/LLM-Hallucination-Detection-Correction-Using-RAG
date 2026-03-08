@@ -16,8 +16,8 @@ from pinecone import Pinecone
 
 # api keys section 
 
-SERPAPI_API_KEY = "ENTER_API_HERE"
-PINECONE_API_KEY = "ENTER_API_HERE"
+SERPAPI_API_KEY = "3b5e8c37d4769cf12f42df01df5baa17f207836ee859d08f62d66607cd06cfb4"
+PINECONE_API_KEY = "pcsk_4EeaiW_PxmXpizoWmimbi8q9Cn3NTEMQJK9Xz14epbTWVwJGyWbyRp6cQy5BeEuE3AP9ws"
 
 os.environ["SERPAPI_API_KEY"] = SERPAPI_API_KEY
 os.environ["PINECONE_API_KEY"] = PINECONE_API_KEY
@@ -118,9 +118,6 @@ def split_text(documents):
 
     return splitter.split_documents(documents)
 
-
-
-
 def index_documents(docs):
 
     texts = []
@@ -202,14 +199,6 @@ if question:
 
     st.chat_message("user").write(question)
     
-    # image searching when a question raised
-
-    images = search_images(question)
-
-    st.subheader("Related Images")
-
-    for img in images:
-        st.image(img, width=500)
 
     with st.spinner("Searching Google..."):
 
