@@ -266,7 +266,7 @@ def cached_embed_text(text, _embeddings_model):
 
 ┌────────────────────────────────────────────────────────────────┐
 │  🤖 Assistant                                                   │
-│                                                                 │
+│                                                                │
 │  Photosynthesis is the process by which plants convert light   │
 │  energy into chemical energy. This occurs primarily in the     │
 │  chloroplasts of plant cells, where chlorophyll captures       │
