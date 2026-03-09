@@ -1,69 +1,113 @@
 # LLM Hallucination Detection & Correction Using RAG
 
-A Retrieval-Augmented Generation (RAG) assistant with **real-time hallucination detection** that validates and scores LLM-generated answers by comparing them against retrieved web content. The app searches the web, scrapes relevant pages, stores content in Pinecone, generates context-grounded answers, and provides detailed confidence scores showing how well each sentence is supported by the retrieved sources.
+A Retrieval-Augmented Generation (RAG) system with **real-time hallucination detection** that automatically validates LLM-generated answers by comparing them against retrieved web content. When hallucination is detected, the system automatically provides corrected answers with source links.
+
+## 🎯 New UI Architecture
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│                        HALLUCINATION DETECTION RAG SYSTEM                               │
+├─────────────────────────────────┬──────────────────────────────────────────────────────┤
+│                                 │                                                      │
+│  🎯 HALLUCINATION DETECTION     │         💬 USER QUESTION ASKED TO LLM                │
+│         REPORT                  │                                                      │
+│                                 │    ┌──────────────────────────────────────────────┐  │
+│  Overall Confidence: 87% ✅     │    │  User: What is machine learning?             │  │
+│  Classification: WELL-GROUNDED  │    │                                              │  │
+│                                 │    │  🦙 Llama: Machine learning is a subset...   │  │
+│  Confidence Meter:              │    │                                              │  │
+│  [████████████████████░░░] 87%  │    │  User: Next question...                      │  │
+│                                 │    │                                              │  │
+│  📊 Detailed Sentence Analysis: │    │  🤖 RAG: (shown when LLM hallucinated)       │  │
+│  1. ✅ 94% - "Machine learning.."│    └──────────────────────────────────────────────┘  │
+│  2. ✅ 86% - "It uses algo..."   │                                                      │
+│  3. ✅ 81% - "Common apps..."    │         📥 INPUT SECTION                            │
+│                                 │    ┌──────────────────────────────────────────────┐  │
+│  💡 Interpretation:             │    │  [Ask anything...]  [🚀 Send] [🗑️ Clear]     │  │
+│  HIGH CONFIDENCE - Well-grounded│    └──────────────────────────────────────────────┘  │
+│                                 │                                                      │
+├─────────────────────────────────┤                                                      │
+│  📦 RAG UNIT                    │                                                      │
+│                                 │                                                      │
+│  🔗 Web Scrapped Links:         │                                                      │
+│  1. wikipedia.org/...           │                                                      │
+│  2. sciencedirect.com/...       │                                                      │
+│                                 │                                                      │
+│  📝 Textual Content (excerpts)  │                                                      │
+│  & More...                      │                                                      │
+└─────────────────────────────────┴──────────────────────────────────────────────────────┘
+                                        ▲
+                                        │ CONTINUOUS LOOP
+                                        ▼
+              ┌─────────────────────────────────────────────────────────┐
+              │  IF ANALYZED LLM OUTPUT IS HALLUCINATED THEN            │
+              │  GENERATE RAG BASED ANSWER OTHERWISE IGNORE RAG         │
+              └─────────────────────────────────────────────────────────┘
+```
 
 ## How It Works
 
 ```
 ┌─────────────────┐     ┌────────────────────┐     ┌──────────────────┐
-│ Ask a Question  │ ──► │ Google Search      │ ──► │ Scrape Top URLs  │
-│ (chat input)    │     │ (SerpAPI, top 5)   │     │ (WebBaseLoader)  │
+│ User Question   │ ──► │ LLM (Llama 3.2)    │ ──► │ Generate Answer  │
+│ (right side UI) │     │ Direct Response    │     │                  │
 └─────────────────┘     └────────────────────┘     └────────┬─────────┘
-                                                             │
-                                                             ▼
-┌──────────────────┐     ┌────────────────────┐     ┌──────────────────┐
-│ Pinecone Store   │ ◄── │ Chunk + Embed      │ ◄── │ Split Documents  │
-│ (rag-embedds)    │     │ (nomic-embed-text) │     │ (2000 / 100)     │
-└────────┬─────────┘     └────────────────────┘     └──────────────────┘
-         │
-         ▼
-┌──────────────────┐     ┌────────────────────┐     ┌──────────────────┐
-│ Retrieve Top 3   │ ──► │ Build Prompt       │ ──► │ Generate Answer  │
-│ similar chunks   │     │ with context       │     │ (llama3.2:1b)    │
-└────────┬─────────┘     └────────────────────┘     └────────┬─────────┘
-         │                                                    │
-         │                                                    ▼
-         │                                          ┌──────────────────┐
-         │                                          │ Split Answer     │
-         │                                          │ into Sentences   │
-         │                                          └────────┬─────────┘
-         │                                                   │
-         └───────────────────────────────────────────────────┘
-                                  │
-                                  ▼
-                       ┌────────────────────────┐
-                       │ Hallucination Detection│
-                       │ (Cosine Similarity)    │
-                       └────────┬───────────────┘
-                                │
-                                ▼
-                       ┌────────────────────────┐
-                       │ Display Confidence     │
-                       │ Score & Report         │
-                       └────────────────────────┘
+                                                            │
+                        ┌───────────────────────────────────┘
+                        │
+                        ▼
+     ┌──────────────────────────────────────────────────────────────┐
+     │              HALLUCINATION ANALYSIS ENGINE                    │
+     │  ┌──────────────┐    ┌──────────────────┐                    │
+     │  │ LLM Output   │───►│ Token Matching   │                    │
+     │  │ Tokens       │    │ with VDB Chunks  │                    │
+     │  └──────────────┘    └────────┬─────────┘                    │
+     │                               │                              │
+     │  ┌──────────────┐    ┌────────▼─────────┐                    │
+     │  │ Pinecone VDB │◄──►│ Embedding        │                    │
+     │  │ (web chunks) │    │ Similarity       │                    │
+     │  └──────────────┘    └────────┬─────────┘                    │
+     │                               │                              │
+     │                      ┌────────▼─────────┐                    │
+     │                      │ Confidence Score │                    │
+     │                      │ & Classification │                    │
+     │                      └────────┬─────────┘                    │
+     └───────────────────────────────┼──────────────────────────────┘
+                                     │
+                    ┌────────────────┴─────────────────┐
+                    │                                  │
+          ┌─────────▼─────────┐              ┌─────────▼─────────┐
+          │ Confidence < 35%  │              │ Confidence >= 35% │
+          │ = HALLUCINATED    │              │ = WELL-GROUNDED   │
+          └─────────┬─────────┘              └─────────┬─────────┘
+                    │                                  │
+          ┌─────────▼─────────┐              ┌─────────▼─────────┐
+          │ 🤖 RAG ACTIVATES  │              │ ✅ USE LLM ANSWER │
+          │ • Scrape web      │              │ (No RAG needed)   │
+          │ • Get sources     │              │                   │
+          │ • Generate new    │              │                   │
+          │   grounded answer │              │                   │
+          └───────────────────┘              └───────────────────┘
 ```
 
 ### Step-by-Step Process
 
-1. **User Input**: User enters a question in Streamlit chat.
-2. **Web Search**: App fetches related Google results using SerpAPI and keeps top 5 links.
-3. **Image Preview**: App fetches related Google Images (top 4) and displays them.
-4. **Scraping**: App scrapes content from discovered URLs with WebBaseLoader.
-5. **Chunking**: Documents are split into chunks (chunk size 2000, overlap 100).
-6. **Embedding**: Chunks are embedded with nomic-embed-text (768 dimensions).
-7. **Storage**: Embedded chunks are inserted into Pinecone index rag-embedds.
-8. **Retrieval**: Similarity search retrieves top 3 relevant chunks.
-9. **Generation**: llama3.2:1b generates a detailed response using retrieved context.
-10. **Hallucination Detection**: 
-    - Answer is split into individual sentences
-    - Each sentence is embedded and compared against retrieved chunks
-    - Cosine similarity scores measure grounding in source material
-    - Overall confidence score is calculated (0-100%)
-11. **Report Display**: Comprehensive report shows:
-    - Overall confidence percentage and classification
-    - Visual confidence meter with color coding
-    - Sentence-by-sentence analysis with individual scores
-    - Interpretation guide and technical details
+1. **User Input**: User enters a question in the chat interface (right side)
+2. **LLM Response**: Llama 3.2 generates an immediate response
+3. **Background Processing**: System automatically:
+   - Searches web with SerpAPI (8 URLs)
+   - Scrapes content from discovered URLs
+   - Chunks documents (1800 chars, 250 overlap)
+   - Embeds and stores in Pinecone
+4. **Hallucination Detection**:
+   - Embeds LLM answer sentences
+   - Compares against Pinecone VDB embeddings
+   - Calculates confidence scores per sentence
+   - Token-level matching for additional validation
+5. **Decision Logic**:
+   - If confidence < 35% → **RAG provides corrected answer with sources**
+   - If confidence >= 35% → **LLM answer is used as-is**
+6. **Report Display**: Left panel shows detailed analysis
 
 ## Features
 
@@ -203,51 +247,103 @@ Important: The embedding model nomic-embed-text outputs 768-d vectors. If index 
 
 ### 6) Configure API keys
 
-Edit `rag_scrapper.py` and replace the placeholder values:
-
-```python
-SERPAPI_API_KEY = "your-serpapi-key-here"
-PINECONE_API_KEY = "your-pinecone-key-here"
-```
-
-**Security Best Practice**: For production, use environment variables instead:
+Edit `config.py` or set environment variables:
 
 ```bash
 export SERPAPI_API_KEY="your-serpapi-key"
 export PINECONE_API_KEY="your-pinecone-key"
 ```
 
-Then modify the code to read from environment:
+Or edit `config.py` directly:
 ```python
-SERPAPI_API_KEY = os.getenv("SERPAPI_API_KEY")
-PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+SERPAPI_API_KEY = "your-serpapi-key-here"
+PINECONE_API_KEY = "your-pinecone-key-here"
 ```
 
 ### 7) Run app
 
+**New UI App (Recommended):**
+```bash
+streamlit run app.py
+```
+
+**Legacy App:**
 ```bash
 streamlit run rag_scrapper.py
 ```
 
 ## Usage
 
-1. **Ask a question** in the chat input box
-2. **View sources**: App displays related images and discovered source URLs
-3. **Wait for processing**: App scrapes, chunks, embeds, and stores content in Pinecone
-4. **Read the answer**: App retrieves relevant chunks and generates a grounded response
-5. **Check confidence**: Hallucination detection report shows:
-   - Overall confidence score and classification
-   - Color-coded confidence meter
-   - Individual sentence scores (expandable)
-   - Interpretation guide explaining the results
-   - Technical details (processing time, model info)
+### New UI (`app.py`)
+
+1. **Chat Interface (Right Side)**:
+   - Type your question in the input box
+   - Click "🚀 Send" to submit
+   - LLM (Llama 3.2) generates a response
+
+2. **Automatic Analysis**:
+   - System automatically searches web and builds context
+   - LLM output is analyzed against Pinecone VDB embeddings
+   - Confidence score is calculated
+
+3. **Hallucination Detection Report (Left Side)**:
+   - Overall confidence percentage
+   - Classification (WELL-GROUNDED / HALLUCINATED)
+   - Visual confidence meter
+   - Sentence-by-sentence analysis
+
+4. **RAG Activation (When Needed)**:
+   - If LLM answer is hallucinated (confidence < 35%)
+   - RAG provides corrected answer with sources
+   - Web scrapped links are displayed
+   - Source context snippets are shown
+
+5. **RAG Unit**:
+   - Shows all web scrapped links
+   - Displays extracted textual content
+   - Shows number of chunks retrieved
+
+### Example Flow
+
+```
+User: "What is quantum computing?"
+         │
+         ▼
+┌─────────────────────────────────────────────┐
+│ 🦙 LLM Answer: "Quantum computing uses..."  │
+└─────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────┐
+│ 🎯 Analysis: Confidence 82% ✅ WELL-GROUNDED│
+│ → LLM answer is used (no RAG needed)        │
+└─────────────────────────────────────────────┘
+
+User: "Who invented the flux capacitor?"
+         │
+         ▼
+┌─────────────────────────────────────────────┐
+│ 🦙 LLM Answer: "The flux capacitor was..."  │
+└─────────────────────────────────────────────┘
+         │
+         ▼
+┌─────────────────────────────────────────────┐
+│ 🎯 Analysis: Confidence 18% ❌ HALLUCINATED │
+│ → RAG activates with corrected answer       │
+│ → Sources provided                          │
+└─────────────────────────────────────────────┘
+```
 
 ### Example Output
 
 ```
-👤 User: What is machine learning?
+💬 USER QUESTION ASKED TO LLM
 
-🤖 Assistant: Machine learning is a subset of artificial intelligence...
+User: What is machine learning?
+
+🦙 Llama: Machine learning is a subset of artificial intelligence...
+
+───────────────────────────────────────────────
 
 🎯 HALLUCINATION DETECTION REPORT
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
