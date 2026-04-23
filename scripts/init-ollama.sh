@@ -13,11 +13,18 @@ else
 	ollama pull nomic-embed-text
 fi
 
-if ollama list | grep -q "llama3.2:1b"; then
-	echo "llama3.2:1b already present, skipping pull."
+if ollama list | grep -q "llama3.2:latest"; then
+	echo "llama3.2:latest already present, skipping pull."
 else
-	echo "Pulling llama3.2:1b..."
-	ollama pull llama3.2:1b
+	echo "Pulling llama3.2:latest..."
+	ollama pull llama3.2:latest
+fi
+
+if ollama list | grep -q "smollm2:360m"; then
+	echo "smollm2:360m already present, skipping pull."
+else
+	echo "Pulling smollm2:360m..."
+	ollama pull smollm2:360m
 fi
 
 echo "Ollama model initialization complete."
